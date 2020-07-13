@@ -1,0 +1,219 @@
+#- name: System Version
+#  debug:
+#    msg: "System Version Error" 
+#  when:
+#    - ansible_distribution != 'CentOS'
+#    - ansible_distribution_major_version < 7
+
+#- name: Stop Ansible
+#  shell:
+#    System Version Error
+#  when:
+#    - ansible_distribution != 'CentOS'
+#    - ansible_distribution_major_version < 7
+
+- name: Set Host Name
+  shell:
+    hostnamectl set-hostname {{host_name}}
+
+- name: modprobe br_netfilter
+  shell:
+    modprobe br_netfilter
+  ignore_errors: yes
+    
+- name: Set Sysctl Options
+  copy:
+    src: ../files/sysctl.conf
+    mode: 0644
+    dest: /etc/sysctl.conf
+
+- name: Set Sysctl Loading
+  shell:
+    sysctl -p /etc/sysctl.conf
+
+- name: Set Ulimit Soft Options
+  lineinfile:
+    dest: /etc/security/limits.conf
+    line: '* soft nofile 65535'
+
+- name: Set Ulimit Soft Options
+  lineinfile:
+    dest: /etc/security/limits.conf
+    line: '* hard nofile 65535'
+
+- name: Add rc.local 
+  lineinfile:
+    dest: /etc/rc.local
+    line: 'ulimit -HSn 65536'
+
+- name: Set rc.local mode
+  shell:
+    chmod +x /etc/rc.local
+
+- name: Add .bash_profile
+  lineinfile:
+    dest: /root/.bash_profile
+    line: 'ulimit -HSn 65536'
+
+- name: Swap off
+  shell:
+    swapoff -a
+
+- name: Swap Fstab
+  shell:
+    sed -i 's/^[^#].*swap*/#&/g' /etc/fstab
+
+- name: disable selinux
+  selinux: 
+    state: disabled
+
+- name: firewalld(1/2)
+  service:
+    name: firewalld
+    state: stopped
+    
+- name: firewalld(2/2)
+  service:
+    name: firewalld
+    enabled: false
+    
+- name: 
+  shell:
+    timedatectl set-timezone "{{ timezone }}"
+
+# 设置相关Yum源(离线 在线)
+# 在线
+- name: Add Yum base
+  get_url:
+    url: https://mirrors.aliyun.com/repo/Centos-7.repo
+    dest: /etc/yum.repos.d/CentOS-Base.repo
+    timeout: 90
+  when:
+    - Offline != "yes"
+
+- name: Add Yum epel
+  get_url:
+    url: http://mirrors.aliyun.com/repo/epel-7.repo
+    dest: /etc/yum.repos.d/epel.repo 
+    timeout: 90
+  when:
+    - Offline != "yes"
+    
+- name: Add Yum docker
+  get_url:
+    url: https://mirrors.aliyun.com/docker-ce/linux/centos/docker-ce.repo
+    dest: /etc/yum.repos.d/docker-ce.repo
+    timeout: 90
+  when:
+    - Offline != "yes"
+
+- name: Add Yum kubernetes
+  copy:
+    src: ../files/kubernetes.repo
+    mode: 0644
+    dest: /etc/yum.repos.d/kubernetes.repo
+  when:
+    - Offline != "yes"
+    
+#- name: Add Yum kernel key down 
+#  get_url:
+#    url: https://www.elrepo.org/RPM-GPG-KEY-elrepo.org
+#    dest: /tmp/RPM-GPG-KEY-elrepo.org
+#    timeout: 90
+#  when:
+#    - ipvs == "yes"
+#    - Offline != "yes"
+
+#- name: Add Yum kernel key install
+#  shell:
+#    rpm --import /tmp/RPM-GPG-KEY-elrepo.org
+#  when:
+#    - ipvs == "yes"
+#    - Offline != "yes"   
+     
+#- name: Add Yum kernel rpm down 
+#  get_url:
+#    url: http://www.elrepo.org/elrepo-release-7.0-2.el7.elrepo.noarch.rpm
+#    dest: /tmp/elrepo-release-7.0-2.el7.elrepo.noarch.rpm 
+#    timeout: 90
+#  when:
+#    - ipvs == "yes"
+#    - Offline != "yes"
+    
+#- name: Add Yum kernel rpm install
+#  shell:
+#    rpm -Uvh /tmp/elrepo-release-7.0-2.el7.elrepo.noarch.rpm
+#  when:
+#    - ipvs == "yes"
+#    - Offline != "yes"
+
+- name: Add yum kernel
+  copy:
+    src: ../files/elrepo.repo.centos.7
+    dest: /etc/yum.repos.d/elrepo.repo
+  when:
+    - ipvs == "yes"
+    - Offline != "yes"
+    - ansible_distribution == 'CentOS'
+    - ansible_distribution_major_version == '7'
+    
+# 离线(需要包含rpm,images)
+- name: Clean yum (1/2)
+  file:
+    path: /etc/yum.repos.d/bak
+    state: directory
+
+- name: Clean yum (2/2)
+  shell:
+    mv /etc/yum.repos.d/*.repo /etc/yum.repos.d/bak/
+  ignore_errors: yes
+
+- name: Copy Yum dir
+  copy:
+    src: ../files/Offline/rpm/
+    dest: /opt/yum
+  when:
+    - ssl_host == "yes"
+    - Offline == "yes"
+
+- name: Copy Yum files (1/2)
+  shell:
+    rpm -ivh /opt/yum/sshpass-1.06-2.el7.x86_64.rpm
+  ignore_errors: yes
+  when:
+    - ssl_host == "yes"
+    - Offline == "yes"
+    
+- name: Copy Yum files (2/2)
+  template:
+    src: Offline.repo.j2
+    dest: /etc/yum.repos.d/Offline.repo
+  when:
+    - ssl_host == "yes"
+    - Offline == "yes"
+    
+- name: Copy Yum files bash
+  template:
+    src: copy_yum.sh.j2
+    dest: /tmp/copy_yum.sh
+  when:
+    - ssl_host == "yes"
+    - Offline == "yes"
+ 
+- name: Exec Yum files bash
+  shell:
+    bash /tmp/copy_yum.sh
+  when:
+    - ssl_host == "yes"
+    - Offline == "yes"
+    
+- name: Start Yum
+  shell:
+    bash /opt/yum/start_yum.sh
+  when:
+    - ssl_host == "yes"
+    - Offline == "yes"
+    
+- name: make Yum 
+  shell:
+    yum makecache -y

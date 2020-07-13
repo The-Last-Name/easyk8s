@@ -1,0 +1,139 @@
+- name: Yum Instll Base
+  yum:
+    name: "{{item}}"
+    disable_gpg_check: yes
+  loop:
+    - yum-utils
+    - device-mapper-persistent-data
+    - lvm2
+    - docker-ce
+    - nfs-utils
+    - telnet
+    - net-tools
+    - bash-completion
+    - socat
+    - ipvsadm
+    - kubectl
+    - kubelet
+    - kubeadm
+    - sshpass
+    - pexpect
+    - chrony
+    - expect
+ 
+- name: Docker start
+  service:
+    name: docker
+    state: started
+
+- name: Docker enable
+  service:
+    name: docker
+    enabled: true
+
+- name: Copy Docker cgroupdriver systemd file
+  copy:
+    src: ../files/daemon.json
+    mode: 0755
+    dest: /etc/docker/daemon.json 
+
+- name: Docker restart
+  service:
+    name: docker
+    state: restarted
+
+# ntp时间服务器设置
+- name: Ntp Set
+  lineinfile:
+    dest: /etc/chrony.conf 
+    line: "server {{ntp}} iburst"
+
+- name: Restart chrony
+  service:
+   name: chronyd
+   state: restarted
+    
+# 更新内核相关
+# 判断是否需要更新
+- name: Copy Kernel version py
+  copy:
+    src: ../files/kernel.py
+    dest: /tmp/kernel.py
+  when:  
+    - ipvs == "yes"
+   
+- name: Exec Kernel version py
+  shell:
+    python /tmp/kernel.py kernel
+  register: up_kernel
+  when:  
+    - ipvs == "yes"
+
+#- name: bug True
+#  debug:
+#    msg: "{{up_kernel}}"
+
+# 在线
+- name: Updata Linux kernel - Install
+  yum:
+    name: "{{item}}"
+    enablerepo: elrepo-kernel
+  loop:
+    - kernel-ml-devel
+    - kernel-ml
+  when:  
+    - ipvs == "yes"
+    - up_kernel.stdout == "up"
+    - Offline != "yes"
+    - kernel_up == "yes"
+    
+# 离线
+- name: Updata Linux kernel - Install
+  yum:
+    name: "{{item}}"
+  loop:
+    - kernel-ml-devel
+    - kernel-ml
+  when:  
+    - ipvs == "yes"
+    - up_kernel.stdout == "up"
+    - Offline == "yes"
+    - kernel_up == "yes"
+
+- name: Set Linux kernel
+  shell:
+    python /tmp/kernel.py up_kernel
+  when:  
+    - ipvs == "yes"
+    - up_kernel.stdout == "up"
+    - kernel_up == "yes"
+
+    
+# IPVS相关设置
+- name: Copy Ipvs File
+  copy:
+    src: ../files/ipvs.modules
+    mode: 0755
+    dest: /etc/sysconfig/modules/ipvs.modules
+  when:  
+    - ipvs == "yes"
+    - kernel_up == "yes"
+    
+- name: Copy Ipvs File
+  copy:
+    src: ../files/ipvs.modules
+    mode: 0755
+    dest: /etc/sysconfig/modules/ipvs.modules
+  when:  
+    - ipvs == "yes"
+
+- name: Load Ipvs File
+  shell:
+    bash /etc/sysconfig/modules/ipvs.modules
+  when:  
+    - ipvs == "yes"
+
+- name: kubelet enable
+  service:
+    name: kubelet
+    enabled: true

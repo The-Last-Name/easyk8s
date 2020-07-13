@@ -1,0 +1,10 @@
+#!/bin/bash
+master_host_ip=`echo {{ all_host_ip }} | sed 's/\[//g' | sed 's/\]//g' | sed 's/,//g'`
+node_host_ip=`echo {{ node_host_ip }} | sed 's/\[//g' | sed 's/\]//g' | sed 's/,//g'`
+for ip in $master_host_ip $node_host_ip;
+do
+  if [[ $ip != "{{ ansible_default_ipv4.address }}" ]];
+  then
+    sshpass -p {{ ansible_ssh_pass }} scp -o StrictHostKeyChecking=no /etc/yum.repos.d/Offline.repo $ip:/etc/yum.repos.d/Offline.repo
+  fi
+done

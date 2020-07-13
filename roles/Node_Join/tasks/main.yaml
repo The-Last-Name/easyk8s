@@ -1,0 +1,58 @@
+- name: kubeadm reset (1/3)
+  shell:
+    ls /etc/kubernetes/pki
+  ignore_errors: True
+  register: result
+  
+- name: kubeadm reset (2/3)
+  copy:
+    src: ../files/kubeadm_reset.sh
+    mode: 0755
+    dest: /tmp/kubeadm_reset.sh
+    
+- name: kubeadm reset (3/3)
+  shell:
+    bash /tmp/kubeadm_reset.sh
+  when:
+    - result.stdout != ""
+
+# 离线需要提前准备镜
+- name: down loading images (1/3)
+  shell:
+    cat /etc/yum.repos.d/Offline.repo  | grep baseurl | awk -F "=" '{print $2}'
+  register: images_url
+  when:
+    - Offline == "yes"
+    
+- name: down loading images (2/3)
+  get_url:
+    url: "{{images_url.stdout}}images/k8s/{{k8sversion}}/{{k8sversion}}.tar"
+    dest: "/tmp/{{k8sversion}}.tar"
+    timeout: 120
+  when:
+    - Offline == "yes"   
+
+- name: down loading images (3/3)
+  shell:
+    docker load -i /tmp/"{{k8sversion}}".tar
+  when:
+    - Offline == "yes"     
+ 
+# load镜像和
+- name: down load cni images (1/2)
+  get_url:
+    url: "{{images_url.stdout}}images/cni/{{cni}}/{{cni}}.tar"
+    dest: "/tmp/{{cni}}.tar"
+    timeout: 120
+  when:
+    - Offline == "yes"
+
+- name: down load cni images (2/2)
+  shell:
+    "docker load -i /tmp/{{cni}}.tar"
+  when:
+    - Offline == "yes"    
+
+- name: kubeadm join
+  shell:
+    bash /tmp/kubeadm_join_node.sh

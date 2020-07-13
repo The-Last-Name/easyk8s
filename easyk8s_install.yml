@@ -1,0 +1,13 @@
+- hosts: all
+  roles:
+    - Set_Base
+    - Install_Base
+
+- hosts: k8smaster
+  roles:
+    - Kubeadm_Init
+    - keepalived
+    
+- hosts: k8snode
+  roles:
+    - Node_Join

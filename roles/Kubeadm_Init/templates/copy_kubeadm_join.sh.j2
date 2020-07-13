@@ -1,0 +1,20 @@
+#!/bin/bash
+# Time: 2020.7.3
+# BY: The Last Name
+all_host_ip=`echo {{ all_host_ip }} | sed 's/\[//g' | sed 's/\]//g' | sed 's/,//g'`
+for ip in $all_host_ip;
+do
+  if [[ $ip != "{{ ansible_default_ipv4.address }}" ]];
+  then
+    sshpass -p {{ ansible_ssh_pass }} scp -o StrictHostKeyChecking=no /tmp/kubeadm_join_master.sh $ip:/tmp/kubeadm_join_master.sh
+  fi
+done
+
+node_host_ip=`echo {{ node_host_ip }} | sed 's/\[//g' | sed 's/\]//g' | sed 's/,//g'`
+for ip in $node_host_ip;
+do
+  if [[ $ip != "{{ ansible_default_ipv4.address }}" ]];
+  then
+    sshpass -p {{ ansible_ssh_pass }} scp -o StrictHostKeyChecking=no /tmp/kubeadm_join_node.sh $ip:/tmp/kubeadm_join_node.sh
+  fi
+done
