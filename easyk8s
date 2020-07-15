@@ -1,0 +1,235 @@
+#!/usr/bin/python
+# -*- coding: utf-8 -*-
+# Time: 2020.07.08
+# BY: The Last Name
+from __future__ import print_function
+import os,re,sys,subprocess
+sys.path.append(os.path.join(os.getcwd(),"site-packages"))
+import jinja2
+
+version='''
+=======================================================================================
+                                               #####
+            ######   ##    ####  #   # #    # #     #  ####
+            #       #  #  #       # #  #   #  #     # #
+            #####  #    #  ####    #   ####    #####   ####
+            #      ######      #   #   #  #   #     #      #
+            #      #    # #    #   #   #   #  #     # #    #
+            ###### #    #  ####    #   #    #  #####   ####   V0.0.2
+                                                              BY: The Last Name
+=======================================================================================
+help: Some parameters are directly returned using the default
+帮助：部分参数直接回车使用默认
+'''
+options={}
+
+def is_ipv4(ip):
+    return True  if [1] * 4 == [x.isdigit() and 0 <= int(x) <= 255 for x in ip.split(".")] else False
+
+def option_input(msg,key,Result_set=[],if_Result=False):
+    # 打印信息，结果集合，判断结果是否结果集
+    Result_status = True
+    while Result_status:
+        # 兼容python2/3
+        try:
+            Result=raw_input(msg)
+        except:
+            print(msg,end="")
+            Result=input()
+        finally:
+            if if_Result:
+                if Result in Result_set:
+                    options[key]=Result
+                    Result_status = False
+            else:
+                options[key] = Result
+                Result_status = False
+
+def option_input_append(msg,sum):
+    # 兼容python2/3
+    Result_list=[]
+    for i in range(sum):
+        Result_status = True
+        while Result_status:
+            try:
+                Result = raw_input(msg + str(i+1) + ":")
+            except:
+                print(msg + str(i+1) + ":", end="")
+                Result = input()
+            if is_ipv4(Result):
+                Result_list.append(Result)
+                Result_status = False
+    return Result_list
+
+def option_hostname_append(msg,sum):
+    # 兼容python2/3
+    Result_list=[]
+    for i in range(sum):
+        Result_status = True
+        while Result_status:
+            try:
+                Result = raw_input(msg + str(i+1) + ":")
+            except:
+                print(msg + str(i+1) + ":", end="")
+                Result = input()
+            if Result != "":
+                Result_list.append(Result)
+                Result_status = False
+    return Result_list
+
+def is_timezone(timezone):
+    return os.path.exists("/usr/share/zoneinfo/"+timezone)
+
+def run_shell(shell):
+    cmd = subprocess.Popen(shell, stdin=subprocess.PIPE, stderr=sys.stderr, close_fds=True,stdout=sys.stdout, universal_newlines=True, shell=True, bufsize=1)
+    cmd.communicate()
+    return cmd.returncode
+
+def Install():
+    print(version)
+    options["HOSTS"] = "yes"
+    if os.path.exists("hosts"):
+        option_input("配置文件已存在是否覆盖 请输入:(yes/no)", "HOSTS", ["yes", "no"], True)
+    if options["HOSTS"] == "yes":
+        option_input("是否启用HA 请输入:(yes/no):", "HA", ["yes", "no"], True)
+        option_input("是否离线安装 请输入:(yes/no):", "Offline", ["yes", "no"], True)
+        option_input("是否升级系统内核 请输入:(yes/no):", "kernel_up", ["yes", "no"], True)
+
+        Result_status = True
+        while Result_status:
+            option_input("ntp服务器地址 回车默认:(120.25.108.11)", "ntp", [], False)
+            if options["ntp"] == "":
+                options["ntp"] = "120.25.108.11"
+            if is_ipv4(options["ntp"]):
+                Result_status = False
+
+        Result_status = True
+        while Result_status:
+            option_input("时区设置 回车默认:(Asia/Shanghai):","timezone",[],False)
+            if options["timezone"] == "":
+                options["timezone"] = "Asia/Shanghai"
+            if is_timezone(options["timezone"]):
+                Result_status = False
+
+        # 当前版本因为只测试一个k8s版本所以不知道后面的版本是否支持
+        Result_status = True
+        while Result_status:
+            option_input("k8s的版本 回车默认:(v1.18.0):", "k8sversion", ["v1.18.0"], False)
+            if options["k8sversion"] == "":
+                options["k8sversion"] = "v1.18.0"
+            if options["k8sversion"] in ["v1.18.0"]:
+                Result_status = False
+
+        Result_status = True
+        while Result_status:
+            option_input("pod的网段 回车默认:(10.244.0.0/16):", "podSubnet", [], False)
+            if options["podSubnet"] == "":
+                options["podSubnet"] = "10.244.0.0/16"
+            if re.match('^.*\..*\..*\..*/[0-9]{1,}$', options["podSubnet"]) and len(
+                    options["podSubnet"].split("/")) == 2 and int(options["podSubnet"].split("/")[1]) <= 24:
+                if is_ipv4(options["podSubnet"].split("/")[0]):
+                    Result_status = False
+
+        Result_status = True
+        while Result_status:
+            option_input("svc的网段 回车默认:(10.10.0.0/16):", "serviceSubnet", [], False)
+            if options["serviceSubnet"] == "":
+                options["serviceSubnet"] = "10.10.0.0/16"
+            if re.match('^.*\..*\..*\..*/[0-9]{1,}$', options["serviceSubnet"]) and len(
+                    options["podSubnet"].split("/")) == 2 and int(options["serviceSubnet"].split("/")[1]) <= 24:
+                if is_ipv4(options["serviceSubnet"].split("/")[0]):
+                    Result_status = False
+
+        option_input("是否启用ipvs 请输入:(yes/no):", "ipvs", ["yes", "no"], True)
+        option_input("网络插件 请输入:(flannel,calico)):", "cni", ["flannel", "calico"], True)
+
+        if options["HA"] == "yes":
+            option_input("K8s Mster 请输入:主机数量（3/5/7）:", "HA_SUM", ["3", "5", "7"], True)
+        else:
+            options["HA_SUM"] = "1"
+
+        options["HA_SUM"] = int(options["HA_SUM"])
+
+        options["all_host_ip"] = option_input_append("请输入 IP addr Master ", options["HA_SUM"])
+        options["all_host_name"] = option_hostname_append("请输入 hostname Master ", options["HA_SUM"])
+
+        if options["HA"] == "yes":
+            Result_status = True
+            while Result_status:
+                option_input("请输入 K8s Mster vip addr:", "vip", [], False)
+                if is_ipv4(options["vip"]):
+                    Result_status = False
+        else:
+            options["vip"] = ""
+
+        Result_status = True
+        while Result_status:
+            option_input("请输入 K8s Node 主机数量(例如:3):", "NODE_SUM", [], False)
+            try:
+                if int(options["NODE_SUM"]) >= 1:
+                    Result_status = False
+            except:
+                Result_status = True
+
+        options["NODE_SUM"] = int(options["NODE_SUM"])
+
+        options["node_host_ip"] = option_input_append("IP addr Node ", options["NODE_SUM"])
+        options["node_host_hostname"] = option_hostname_append("hostname Node ", options["NODE_SUM"])
+
+        Result_status = True
+        while Result_status:
+            option_input("请输入 主机的root密码(所有主机需要密码一致):", "password", [], False)
+            if options["password"] != "":
+                Result_status = False
+
+        # print(options)
+
+        TemplateLoader = jinja2.FileSystemLoader(os.path.abspath('.'))
+        TemplateEnv = jinja2.Environment(loader=TemplateLoader)
+        template = TemplateEnv.get_template('hosts.j2')
+        dsconf = template.render(options=options)
+        try:
+            f = open("hosts", "w", encoding="utf-8")
+        except:
+            reload(sys)
+            sys.setdefaultencoding('utf-8')
+            f = open("hosts","w")
+        f.write(dsconf)
+        f.close()
+    #安装命令写这里
+    os.system("bash sh/ansible_init.sh")
+    print(run_shell("ansible-playbook -i hosts easyk8s_install.yml"))
+
+def Help():
+    print("""
+    easyk8s 是一款快速搭建k8s集群的个人小工具
+    BY: The Last Name
+    参数：
+    install     安装向导模式
+    download    下载默认离线包
+    """)
+
+if __name__ == '__main__':
+    fun_key={"install":Install,"help":Help}
+    try:
+        if len(sys.argv) > 1 and sys.argv[1] in fun_key:
+            fun_key[sys.argv[1]]()
+        else:
+            Help()
+    except:
+        exit()
+
+
+# 是否启用HA(yes/no)
+# 是否离线安装(yes/no)
+# 是否升级内核(yes/no)
+# ntp服务器地址
+# 时区设置 Asia/Shanghai
+# k8s的版本 v1.18.0
+# pod的网段 10.244.0.0/16
+# svc的网段 10.10.0.0/16
+# 是否启用ipvs(yes/no)
+# 网络插件(flannel,calico)
+# 根据HA判断 设置master IP和主机名
+# 根据HA判断 master vip
+# 设置node IP和主机名
