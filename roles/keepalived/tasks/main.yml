@@ -1,0 +1,55 @@
+- name: Keepalived install
+  yum:
+    name: keepalived
+  when:
+    - HA == "yes"
+    
+- name: if_net_name (1/2)
+  template:
+    src: net_name.sh.j2
+    dest: /tmp/net_name.sh
+  when:
+    - HA == "yes"
+   
+- name: if_net_name (2/2)
+  shell:
+    bash /tmp/net_name.sh
+  register: if_net_name
+  when:
+    - HA == "yes"
+  
+- name: set vip
+  shell:
+    ip addr del {{vip}}/24 dev "{{if_net_name.stdout}}"
+  ignore_errors: True
+  when:
+    - ssl_host == "yes"
+    - HA == "yes"
+    
+- name: Copy Keepalived Config
+  template:
+    src: keepalived.conf.j2
+    dest: /etc/keepalived/keepalived.conf
+  when:
+    - HA == "yes"
+
+- name: keepalived serveice (1/2)
+  service:
+    name: keepalived
+    state: started
+  when:
+    - HA == "yes"
+
+- name: keepalived serveice (2/2)
+  service:
+    name: keepalived
+    enabled: true
+  when:
+    - HA == "yes"
+    
+- name: keepalived serveice (1/2)
+  service:
+    name: keepalived
+    state: restarted
+  when:
+    - HA == "yes"

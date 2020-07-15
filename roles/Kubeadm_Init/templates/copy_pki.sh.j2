@@ -1,0 +1,13 @@
+#!/bin/bash
+all_host_ip=`echo {{ all_host_ip }} | sed 's/\[//g' | sed 's/\]//g' | sed 's/,//g'`
+for ip in $all_host_ip;
+do
+  if [[ $ip != "{{ ansible_default_ipv4.address }}" ]];
+  then
+    sshpass -p {{ ansible_ssh_pass }} ssh -o StrictHostKeyChecking=no $ip "mkdir -p /etc/kubernetes/pki/etcd/"
+    sshpass -p {{ ansible_ssh_pass }} scp -o StrictHostKeyChecking=no /etc/kubernetes/pki/ca* $ip:/etc/kubernetes/pki/
+    sshpass -p {{ ansible_ssh_pass }} scp -o StrictHostKeyChecking=no /etc/kubernetes/pki/sa* $ip:/etc/kubernetes/pki/
+    sshpass -p {{ ansible_ssh_pass }} scp -o StrictHostKeyChecking=no /etc/kubernetes/pki/front-proxy-ca* $ip:/etc/kubernetes/pki/
+    sshpass -p {{ ansible_ssh_pass }} scp -o StrictHostKeyChecking=no /etc/kubernetes/pki/etcd/ca.* $ip:/etc/kubernetes/pki/etcd/
+  fi
+done

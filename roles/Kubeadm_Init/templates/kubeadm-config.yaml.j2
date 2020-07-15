@@ -1,0 +1,28 @@
+apiVersion: kubeadm.k8s.io/v1beta2
+imageRepository: registry.aliyuncs.com/google_containers
+kind: ClusterConfiguration
+kubernetesVersion: {{k8sversion}}
+{% if vip != "" %}
+controlPlaneEndpoint: "{{ vip }}:6443"
+{% endif %}
+networking:
+  dnsDomain: cluster.local 
+  podSubnet: {{ podSubnet }} 
+  serviceSubnet: {{serviceSubnet}}
+apiServer:
+  certSANs:
+{% for name in all_host_name %}
+    - {{ name }}
+{% endfor %}
+{% for ip in all_host_ip %}
+    - {{ ip }}
+{% endfor %}
+{% if vip != "" %}
+    - {{ vip }}
+{% endif %}
+---
+apiVersion: kubeproxy.config.k8s.io/v1alpha1
+kind: KubeProxyConfiguration
+{% if ipvs == "yes" %}
+mode: ipvs
+{% endif %}

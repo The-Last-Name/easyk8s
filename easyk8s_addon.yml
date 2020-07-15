@@ -1,0 +1,12 @@
+- hosts: all
+  roles:
+    - Set_Base
+    - Install_Base
+    
+- hosts: k8smaster
+  roles:
+    - addon
+    
+- hosts: k8snode
+  roles:
+    - Node_Join

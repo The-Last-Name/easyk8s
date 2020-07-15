@@ -1,0 +1,9 @@
+{
+    "exec-opts": ["native.cgroupdriver=systemd"],
+    "registry-mirrors":["https://es72s9yi.mirror.aliyuncs.com",
+                    "http://hub-mirror.c.163.com",
+                    "https://dhq9bx4f.mirror.aliyuncs.com",
+                    "https://docker.mirrors.ustc.edu.cn",
+                    "https://registry.docker-cn.com"
+                   ]
+}

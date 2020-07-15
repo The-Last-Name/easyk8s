@@ -1,0 +1,11 @@
+#!/bin/bash
+net_name=`ip link | grep ^[0-9] | awk -F ":" '{print $2}' | grep -v lo | grep -v docker | awk '{gsub(/^\s+|\s+$/, "");print}'`
+for net_i in $net_name;
+do
+  (ifconfig $net_i | grep {{ ansible_default_ipv4.address }}) > /dev/null 2>&1
+  if [[ $? -eq 0 ]];
+  then
+    echo "$net_i"
+    exit
+  fi
+done
