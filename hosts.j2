@@ -1,0 +1,43 @@
+[all:vars]
+# 是否离线安装 yes | no
+HA="{{ options["HA"] }}"
+Offline="{{ options["Offline"] }}"
+k8sversion="{{ options["k8sversion"] }}"
+podSubnet="{{ options["podSubnet"] }}"
+serviceSubnet="{{ options["serviceSubnet"] }}"
+kernel_up="{{ options["kernel_up"] }}"
+ipvs="{{ options["ipvs"] }}"
+
+# 主机的变化以下3个变量也需要变化
+all_host_ip={{ options["all_host_ip"] }}
+all_host_name={{ options["all_host_name"] }}
+node_host_ip={{ options["node_host_ip"] }}
+# 这个字段必须存在
+addon_host_ip=[]
+
+vip="{{ options["vip"] }}"
+ntp="{{ options["ntp"] }}"
+timezone="{{ options["timezone"] }}"
+#网络插件类型
+#flannel,calico
+cni="{{ options["cni"] }}"
+
+#单节点 不能使用vip
+[k8smaster]
+{% for i in range(options["HA_SUM"]) -%}
+{%- if i == 0 -%}
+{{ options["all_host_ip"][i] }} ansible_ssh_user=root ansible_ssh_pass="{{ options["password"] }}" host_name="{{ options["all_host_name"][i] }}" ssl_host="yes" keepalived_state="MASTER" keepalived_Weights="{{ 100 - i }}"
+{% else -%}
+{{ options["all_host_ip"][i] }} ansible_ssh_user=root ansible_ssh_pass="{{ options["password"] }}" host_name="{{ options["all_host_name"][i] }}" ssl_host="no"  keepalived_state="BACKUP" keepalived_Weights="{{ 100 - i }}"
+{% endif %}
+{%- endfor -%}
+
+
+[k8snode]
+{% for i in range(options["NODE_SUM"]) -%}
+{{ options["node_host_ip"][i] }} ansible_ssh_user=root ansible_ssh_pass="{{ options["password"] }}" host_name="{{ options["node_host_hostname"][i] }}" ssl_host="no"
+{% endfor %}
+
+#保证最后一行是空行
+[addon]
+

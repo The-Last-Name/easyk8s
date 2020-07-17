@@ -1,0 +1,65 @@
+- name: kubeadm token (1/4)
+  copy:
+    src: ../files/kubeadm_token.sh
+    mode: 0755
+    dest: /tmp/kubeadm_token.sh
+  when:
+   - ssl_host == "yes"
+    
+- name: kubeadm token (2/4)
+  shell:
+    bash /tmp/kubeadm_token.sh
+  register: token
+  when:
+   - ssl_host == "yes"
+   
+- name: kubeadm token (3/4)
+  shell:
+    openssl x509 -pubkey -in /etc/kubernetes/pki/ca.crt | openssl rsa -pubin -outform der 2>/dev/null | openssl dgst -sha256 -hex | sed  's/^ .* //' | awk '{print $2}'
+  register: x509
+  when:
+   - ssl_host == "yes"
+  
+- name: kubeadm token (4/4)
+  template:
+    src: kubeadm_join_node.sh.j2
+    dest: /tmp/kubeadm_join_node.sh
+  when:
+    - ssl_host == "yes"
+    
+- name: copy kubeadm_join_node (1/2)
+  template:
+    src: scp_addon_kubeadm_join.sh.j2
+    dest: /tmp/scp_addon_kubeadm_join.sh
+  when:
+    - ssl_host == "yes"
+
+- name: copy kubeadm_join_node (2/2)
+  shell:
+    bash /tmp/scp_addon_kubeadm_join.sh
+  when:
+    - ssl_host == "yes"
+
+# 直接把离线的yum repo复制给addon
+- name: Start Yum
+  shell:
+    bash /opt/yum/start_yum.sh
+  when:
+    - ssl_host == "yes"
+    - Offline == "yes"
+
+- name: Copy Yum files bash (1/2)
+  template:
+    src: copy_yum.sh.j2
+    dest: /tmp/copy_yum.sh
+  when:
+    - ssl_host == "yes"
+    - Offline == "yes"
+ 
+- name: Copy Yum files bash (2/2)
+  shell:
+    bash /tmp/copy_yum.sh
+  when:
+    - ssl_host == "yes"
+    - Offline == "yes"
+

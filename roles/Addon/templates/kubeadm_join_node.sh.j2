@@ -1,0 +1,2 @@
+kubeadm join 192.168.26.110:6443 --token {{ token.stdout }} \
+    --discovery-token-ca-cert-hash sha256:{{ x509.stdout }}

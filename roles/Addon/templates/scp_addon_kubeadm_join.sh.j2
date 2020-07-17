@@ -1,0 +1,11 @@
+#!/bin/bash
+# Time:2020.7.16
+# BY: The Last Name
+addon_host_ip=`echo {{ addon_host_ip }} | sed 's/\[//g' | sed 's/\]//g' | sed 's/,//g'`
+for ip in $addon_host_ip;
+do
+  if [[ $ip != "{{ ansible_default_ipv4.address }}" ]];
+  then
+    sshpass -p {{ ansible_ssh_pass }} scp -o StrictHostKeyChecking=no /tmp/kubeadm_join_node.sh $ip:/tmp/kubeadm_join_node.sh
+  fi
+done
